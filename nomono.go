@@ -11,6 +11,12 @@ import (
 	"go/types"
 )
 
+func assert(cond bool) {
+	if !cond {
+		panic("assertion failed")
+	}
+}
+
 func Check(info *types.Info, files []*ast.File) error {
 	w := shared{
 		info:      info,
@@ -35,6 +41,7 @@ func Check(info *types.Info, files []*ast.File) error {
 		}
 		targs := inst.TypeArgs
 
+		assert(tparams.Len() == targs.Len())
 		for i := 0; i < tparams.Len(); i++ {
 			w.assign(ident, tparams.At(i), targs.At(i))
 		}
@@ -205,11 +212,6 @@ func (w *shared) assign(ident *ast.Ident, param *types.TypeParam, arg types.Type
 				do(typ.Method(i).Type())
 			}
 		case *types.Signature:
-			if recv := typ.Recv(); recv != nil {
-				if _, isInterface := recv.Type().(*types.Interface); !isInterface {
-					do(recv.Type())
-				}
-			}
 			tuple := func(tup *types.Tuple) {
 				for i := 0; i < tup.Len(); i++ {
 					do(tup.At(i).Type())
@@ -251,12 +253,5 @@ func deref(typ types.Type) types.Type {
 }
 
 func decompose(named *types.Named) (*types.Named, *types.TypeList) {
-	args := named.TypeArgs()
-	for {
-		orig := named.Origin()
-		if named == orig {
-			return orig, args
-		}
-		named = orig
-	}
+	return named.Origin(), named.TypeArgs()
 }
