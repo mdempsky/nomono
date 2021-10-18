@@ -45,6 +45,7 @@ var bads = []string{
 	"type U[T any] int; func (*U[T]) m() { var _ U[*T] }",
 	"type U[T any] [unsafe.Sizeof(F[*T])]byte; func F[T any]() { var _ U[T] }",
 	"func F[A, B, C, D, E any]() { F[B, C, D, E, *A]() }",
+	"type U[_ any] int; const X = unsafe.Sizeof(func() { type A[T any] U[A[*T]] })",
 }
 
 func check(t *testing.T, body string) error {

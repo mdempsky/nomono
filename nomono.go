@@ -47,53 +47,46 @@ func Check(info *types.Info, files []*ast.File) error {
 		}
 	}
 
-	// Floyd-Warshall transitive closure.
-	//
-	// We represent the adjacency graph as a length-N*N slice of
-	// bytes. Value 0 means no connection, 1 means a direct (neutral)
-	// edge, and 2 means an indirect (positive) edge.
-	//
-	// A positive edge combines with a neutral edge or another positive
-	// edge to form a longer positive edge. Two neutral edges combine to
-	// form a longer neutral edge.
-	//
-	// TODO(mdempsky): There's surely a more efficient algorithm here,
-	// but this works as a proof of concept.
 	nparams := len(w.params)
-	m := make([]byte, nparams*nparams)
-	p := func(i, j int) *byte { return &m[i*nparams+j] }
 
-	set := func(i, j int, x byte) {
-		if x > *p(i, j) {
-			*p(i, j) = x
-		}
-	}
-
-	for _, edge := range w.edges {
-		var x byte = 2
-		if edge.direct {
-			x = 1
-		}
-		set(edge.dst, edge.src, x)
-	}
-
-	for k := 0; k < nparams; k++ {
-		for i := 0; i < nparams; i++ {
-			for j := 0; j < nparams; j++ {
-				x := *p(i, k) * *p(k, j)
-				if x > 2 {
-					x = 2 // cap at 2
-				}
-				set(i, j, x)
-			}
-		}
-	}
+	Len := make([]int, nparams)
+	Dis := make([]int, nparams)
+	Enqueued := make([]bool, nparams)
+	var Queue []int
 
 	for i := 0; i < nparams; i++ {
-		if *p(i, i) > 1 {
-			// TODO(mdempsky): Report the loop.
-			// TODO(mdempsky): Report more than one loop?
-			return errors.New("found a positive type parameter loop")
+		Len[i] = 0
+		Dis[i] = 0
+		Queue = append(Queue, i)
+		Enqueued[i] = true
+	}
+
+	for len(Queue) > 0 {
+		// u = Queue.pop()
+		u := Queue[len(Queue)-1]
+		Queue = Queue[:len(Queue)-1]
+		Enqueued[u] = false
+
+		for _, edge := range w.edges {
+			if edge.src == u {
+				v := edge.dst
+				x := Dis[u]
+				if !edge.direct {
+					x--
+				}
+				if x < Dis[v] {
+					Len[v] = Len[u] + 1
+					if Len[v] == nparams {
+						// TODO(mdempsky): Report the loop.
+						return errors.New("found a positive type parameter loop")
+					}
+					Dis[v] = x
+					if !Enqueued[v] {
+						Queue = append(Queue, v)
+						Enqueued[v] = true
+					}
+				}
+			}
 		}
 	}
 
